@@ -16,35 +16,50 @@ const PROFILES_URL = 'http://api.raisely.com/v3/campaigns/switchon/profiles';
  * @query limit
  */
 async function getProfiles(req, res) {
-    const tree = await getTree();
+	try {
+		const tree = await getTree();
 
-    const parent = req.query.parent ? tree.get(parent) : tree.root();
-	if (!parent) throw new HttpError(404);
+		const parent = req.query.parent ? tree.get(parent) : tree.root();
+		if (!parent) throw new HttpError(404);
 
-	const sortKey = req.query.sort === 'descendants' ? 'confiemdChildren' : 'confirmedDescendants';
-	const typeValue = req.query.type === 'team' ? 'TEAM' : 'INDIVIDUAL';
-	const limit = parseInt(req.query.limit || 10);
+		const sortKey = req.query.sort === 'descendants' ? 'confiemdChildren' : 'confirmedDescendants';
+		const typeValue = req.query.type === 'team' ? 'TEAM' : 'INDIVIDUAL';
+		const limit = parseInt(req.query.limit || 10);
 
-	const result = tree.get(parent.children)
-		.map(n => n.data)
-		.filter(profile => profile.type === typeValue)
-		.sort((p1, p2) => p1[sortKey] - p2[sortKey])
-		.slice(0, limit);
+		const result = tree.get(parent.children)
+			.map(n => n.data)
+			.filter(profile => profile.type === typeValue)
+			.sort((p1, p2) => p1[sortKey] - p2[sortKey])
+			.slice(0, limit);
 
-	req.json({
-		data: result,
-		pagination: {
-			total: result.length,
-			pages: 1,
-			prevUrl: null,
-			nextUrl: null,
-			offset: 0,
-			limit,
-		}
-	});
+		res.json({
+			data: result,
+			pagination: {
+				total: result.length,
+				pages: 1,
+				prevUrl: null,
+				nextUrl: null,
+				offset: 0,
+				limit,
+			}
+		});
+	} catch (e) {
+		res.status(e.status || 500);
+		console.error(e);
+		res.json({
+			error: {
+				message: e.message,
+			}
+		})
+	}
 }
 
-
+class HttpError {
+	constructor(status, message) {
+		this.status = status || 500;
+		this.message = message || status === 404 ? 'not found' : 'internal server error';
+	}
+}
 
 /**
  * Fetch ALL profiles for the campaign
